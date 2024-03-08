@@ -4,83 +4,55 @@
 module Load where
 
 import Codec.Picture
-import Codec.Picture.Types
-import Data.Maybe (fromJust, isJust, listToMaybe)
-
-data PietColor
-  = LightRed
-  | NormalRed
-  | DarkRed
-  | LightYellow
-  | NormalYellow
-  | DarkYellow
-  | LightGreen
-  | NormalGreen
-  | DarkGreen
-  | LightCyan
-  | NormalCyan
-  | DarkCyan
-  | LightBlue
-  | NormalBlue
-  | DarkBlue
-  | LightMagenta
-  | NormalMagenta
-  | DarkMagenta
-  | Black
-  | White
-  deriving (Show, Enum, Bounded, Eq)
-
-data Direction = Right | Down | Left | Up
-
-type PietProgram = [[PietColor]]
+import Data.List (find)
+import Data.Maybe (fromJust, isJust)
+import Types
 
 -- lookup function
 colorToRGB :: PietColor -> PixelRGB8
 colorToRGB color = case color of
-  LightRed -> PixelRGB8 255 192 192
-  NormalRed -> PixelRGB8 255 0 0
-  DarkRed -> PixelRGB8 192 0 0
-  LightYellow -> PixelRGB8 255 255 192
-  NormalYellow -> PixelRGB8 255 255 0
-  DarkYellow -> PixelRGB8 192 192 0
-  LightGreen -> PixelRGB8 192 255 192
-  NormalGreen -> PixelRGB8 0 255 0
-  DarkGreen -> PixelRGB8 0 192 0
-  LightCyan -> PixelRGB8 192 255 255
-  NormalCyan -> PixelRGB8 0 255 255
-  DarkCyan -> PixelRGB8 0 192 192
-  LightBlue -> PixelRGB8 192 192 255
-  NormalBlue -> PixelRGB8 0 0 255
-  DarkBlue -> PixelRGB8 0 0 192
-  LightMagenta -> PixelRGB8 255 192 255
-  NormalMagenta -> PixelRGB8 255 0 255
-  DarkMagenta -> PixelRGB8 192 0 192
-  Black -> PixelRGB8 0 0 0
-  White -> PixelRGB8 255 255 255
+  (Red, Light) -> PixelRGB8 255 192 192
+  (Red, Normal) -> PixelRGB8 255 0 0
+  (Red, Dark) -> PixelRGB8 192 0 0
+  (Yellow, Light) -> PixelRGB8 255 255 192
+  (Yellow, Normal) -> PixelRGB8 255 255 0
+  (Yellow, Dark) -> PixelRGB8 192 192 0
+  (Green, Light) -> PixelRGB8 192 255 192
+  (Green, Normal) -> PixelRGB8 0 255 0
+  (Green, Dark) -> PixelRGB8 0 192 0
+  (Cyan, Light) -> PixelRGB8 192 255 255
+  (Cyan, Normal) -> PixelRGB8 0 255 255
+  (Cyan, Dark) -> PixelRGB8 0 192 192
+  (Blue, Light) -> PixelRGB8 192 192 255
+  (Blue, Normal) -> PixelRGB8 0 0 255
+  (Blue, Dark) -> PixelRGB8 0 0 192
+  (Magenta, Light) -> PixelRGB8 255 192 255
+  (Magenta, Normal) -> PixelRGB8 255 0 255
+  (Magenta, Dark) -> PixelRGB8 192 0 192
+  (Black, _) -> PixelRGB8 0 0 0
+  (White, _) -> PixelRGB8 255 255 255
 
--- Reverse lookup function
+isPietColor :: PixelRGB8 -> Bool
+isPietColor rgb = isJust $ rgbToPietColor rgb
+
 rgbToPietColor :: PixelRGB8 -> Maybe PietColor
-rgbToPietColor rgb = listToMaybe [color | color <- [minBound .. maxBound], colorToRGB color == rgb]
+rgbToPietColor rgb = find (\c -> colorToRGB c == rgb) ([(h, l) | h <- [minBound .. maxBound], l <- [minBound .. maxBound]])
 
-loadImage :: FilePath -> IO (Maybe PietProgram)
+loadImage :: FilePath -> IO (MaybeE PietProgram)
 loadImage path = do
   image <- readImage path
   case image of
-    Prelude.Left err -> return Nothing
-    Prelude.Right img -> return $ Just $ imageToPietProgram img
+    Prelude.Left err -> return $ Prelude.Left err
+    Prelude.Right img -> return $ maybe (Prelude.Left " Image contains colors that are not valid in the Piet language.\n\tSee https://www.dangermouse.net/esoteric/piet.html for more information.") Prelude.Right $ imageToPietProgram img
 
-imageToPietProgram :: DynamicImage -> PietProgram
-imageToPietProgram img = pixels
+imageToPietProgram :: DynamicImage -> Maybe PietProgram
+imageToPietProgram img =
+  if isJust $ buildGrid $ convertRGB8 img
+    then buildGrid $ convertRGB8 img
+    else Nothing
   where
-    img' = convertRGB8 img
-    pixels = buildGrid img'
-
-buildGrid :: Image PixelRGB8 -> PietProgram
--- Note: It's OK to use fromJust here because we've already checked that all the colors are valid by this point.
-buildGrid img = [[fromJust $ rgbToPietColor $ pixelAt img x y | x <- [0 .. width - 1]] | y <- [0 .. height - 1]]
-  where
-    width = imageWidth img
-    height = imageHeight img
-
-checkColors :: PietProgram -> Bool
-checkColors = all (all (isJust . (rgbToPietColor . colorToRGB)))
+    buildGrid :: Image PixelRGB8 -> Maybe PietProgram
+    buildGrid img' =
+      if isJust $ rgbToPietColor $ pixelAt img' 0 0
+        then Just $ map (\y -> map (\x -> fromJust $ rgbToPietColor $ pixelAt img' x y) [0 .. imageWidth img' - 1]) [0 .. imageHeight img' - 1]
+        else Nothing

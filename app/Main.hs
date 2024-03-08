@@ -14,5 +14,5 @@ main = do
       let path = head args
       pietProgram <- loadImage path
       case pietProgram of
-        Nothing -> putStrLn "Error loading image"
-        Just p -> putStrLn $ "Image loaded" ++ show p
+        Prelude.Left err -> putStrLn $ "\ESC[31mError:\ESC[0m " ++ err
+        Prelude.Right p -> putStrLn $ "Image loaded" ++ show p
