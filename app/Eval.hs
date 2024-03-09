@@ -1,6 +1,8 @@
 module Eval where
 
+import Data.Maybe (fromJust)
 import Load
+import Stack
 import Types
 
 -- Basic stack operations
@@ -14,51 +16,39 @@ pop (x : xs) = (Just x, xs)
 checkBounds :: PietProgram -> Position -> Bool
 checkBounds prog (x, y) = x >= 0 && y >= 0 && x < length prog && y < length (head prog)
 
--- Move our position in the direction of the direction pointer
-moveDirection :: DirectionPointer -> Position -> Position
-moveDirection DRight (x, y) = (x + 1, y)
-moveDirection DDown (x, y) = (x, y + 1)
-moveDirection DLeft (x, y) = (x - 1, y)
-moveDirection DUp (x, y) = (x, y - 1)
+-- Attempt to move the DP in the current direction, considering boundaries
+moveDP :: PietState -> PietState
+moveDP execCtx = execCtx {position = newPosition}
+  where
+    newPosition = case dp execCtx of
+      DLeft -> (max 0 (fst (position execCtx) - 1), snd (position execCtx))
+      DRight -> (min (width - 1) (fst (position execCtx) + 1), snd (position execCtx))
+      DUp -> (fst (position execCtx), max 0 (snd (position execCtx) - 1))
+      DDown -> (fst (position execCtx), min (height - 1) (snd (position execCtx) + 1))
+    width = length (head (program execCtx))
+    height = length (program execCtx)
 
-getLightnessChange :: Lightness -> Lightness -> Int
-getLightnessChange Normal Normal = 0
-getLightnessChange Normal Light = 1
-getLightnessChange Normal Dark = -1
-getLightnessChange Light Normal = -1
-getLightnessChange Light Light = 0
-getLightnessChange Light Dark = -2
-getLightnessChange Dark Normal = 1
-getLightnessChange Dark Light = 2
-getLightnessChange Dark Dark = 0
+-- Example of integrating a stack operation into the ExecutionContext
+executeCommand :: PietState -> PietState
+executeCommand execCtx = case command of
+  Push value -> execCtx {stack = Stack.push value (stack execCtx)}
+  Add ->
+    let (result, newStack) = Stack.add (stack execCtx)
+     in execCtx {stack = maybe (stack execCtx) (: newStack) result}
+  Subtract ->
+    let (result, newStack) = Stack.subtract (stack execCtx)
+     in execCtx {stack = maybe (stack execCtx) (: newStack) result}
+  _ -> execCtx
+  where
+    command = head (commands execCtx)
 
--- Get the change in hue between two hues
--- Should be between 0 and 5
-getHueChange :: Hue -> Hue -> Int
-getHueChange hue1 hue2
-  | hue1 == hue2 = 0
-  | hue1 == Red && hue2 == Yellow = 1
-  | hue1 == Red && hue2 == Magenta = 2
-  | hue1 == Yellow && hue2 == Red = 5
-  | hue1 == Yellow && hue2 == Green = 1
-  | hue1 == Green && hue2 == Yellow = 5
-  | hue1 == Green && hue2 == Cyan = 1
-  | hue1 == Cyan && hue2 == Green = 5
-  | hue1 == Cyan && hue2 == Blue = 1
-  | hue1 == Blue && hue2 == Cyan = 5
-  | hue1 == Blue && hue2 == Magenta = 1
-  | hue1 == Magenta && hue2 == Blue = 5
-  | hue1 == Magenta && hue2 == Red = 1
-  | hue1 == Red && hue2 == Green = 3
-  | hue1 == Red && hue2 == Cyan = 4
-  | hue1 == Yellow && hue2 == Magenta = 3
-  | hue1 == Yellow && hue2 == Blue = 4
-  | hue1 == Green && hue2 == Red = 3
-  | hue1 == Green && hue2 == Magenta = 4
-  | hue1 == Cyan && hue2 == Red = 3
-  | hue1 == Cyan && hue2 == Yellow = 4
-  | hue1 == Blue && hue2 == Yellow = 3
-  | hue1 == Blue && hue2 == Green = 4
-  | hue1 == Magenta && hue2 == Green = 3
-  | hue1 == Black || hue2 == Black = 0
-  | otherwise = 0
+-- Function to calculate the hue and lightness change between two pixels
+calculateTransition :: PietColor -> PietColor -> ColorChange
+calculateTransition prevColor nextColor = (hueChange, lightnessChange)
+  where
+    hueChange = fromEnum (fst nextColor) - fromEnum (fst prevColor)
+    lightnessChange = fromEnum (snd nextColor) - fromEnum (snd prevColor)
+
+-- Map a hue and lightness change to a Piet command
+mapTransitionToCommand :: (HueChange, LightnessChange) -> Command
+mapTransitionToCommand (hueChange, lightnessChange) = undefined
