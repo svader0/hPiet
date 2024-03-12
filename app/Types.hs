@@ -8,7 +8,7 @@ type Position = (Int, Int)
 
 type Stack = [Int]
 
-data Command = Push Int | Pop | Add | Subtract | Multiply | Divide | Modulo | Not | Greater | Pointer | Switch | Duplicate | Roll | InNumber | InChar | OutNumber | OutChar deriving (Eq, Show)
+data Command = Push | Pop | Add | Subtract | Multiply | Divide | Modulo | Not | Greater | Pointer | Switch | Duplicate | Roll | InNumber | InChar | OutNumber | OutChar deriving (Eq, Show)
 
 data Hue = Red | Yellow | Green | Cyan | Blue | Magenta | Black | White deriving (Eq, Show, Enum, Bounded)
 

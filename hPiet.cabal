@@ -65,12 +65,13 @@ executable hPiet
     other-modules: Load
                  , Eval
                  , Types
+                 , Stack
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.17.2.0
+    build-depends:    base ^>=4.17.2.0 || ==4.16.4.0
                     , JuicyPixels ^>=3.3.7
 
     -- Directories containing source files.
